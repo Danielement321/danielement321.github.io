@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HiPrune - Jizhihui Liu</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../../styles.css">
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+    <header style="padding: 1rem 0;">
+        <div class="header-container" style="justify-content: flex-start;">
+            <a href="../../index.html" style="font-size: 1.1rem;"><i class="fas fa-arrow-left"></i> Back to Home</a>
+        </div>
+    </header>
+    <main>
+        <section>
+            <h1 style="color: var(--primary-color);">HiPrune: Hierarchical Attention for Efficient Token Pruning in Vision-Language Models</h1>
+            <p><strong>Authors:</strong> <strong>Jizhihui Liu*</strong>, Feiyi Du*, Guangdao Zhu*, Niu Lian, Jun Li, Bin Chen&dagger;, Weili Guan, Yaowei Wang</p>
+            <p><strong>Venue:</strong> AAAI-26 (Student Abstract) Oral / (Submitted to ACL-26)</p>
+            <div style="margin: 20px 0; display: flex; gap: 15px;">
+                <a href="https://arxiv.org/abs/2508.00553" target="_blank" style="padding: 5px 15px; background: var(--primary-color); color: white; border-radius: 5px; text-decoration: none;"><i class="fas fa-file-pdf"></i> Arxiv Link</a>
+                <a href="https://github.com/Danielement321/HiPrune" target="_blank" style="padding: 5px 15px; background: #333; color: white; border-radius: 5px; text-decoration: none;"><i class="fab fa-github"></i> GitHub Code</a>
+            </div>
+            
+            <div style="margin-top: 3rem; text-align: left;">
+                <p>
+                    Vision-Language Models (VLMs) like LLaVA and Qwen have shown incredible capabilities in multimodal tasks. However, they come with a significant bottleneck: <strong>efficiency</strong>. VLMs encode images into extremely long sequences of visual tokens, leading to massive computational overhead and slow inference speeds.
+                </p>
+                <p>
+                    But do we really need <em>all</em> those tokens?
+                </p>
+                <p>
+                    In our recent paper, we demonstrate that visual tokens are highly redundant. To address this, we introduce <strong>HiPrune</strong>, a training-free, model-agnostic token pruning framework that dramatically accelerates VLM inference without sacrificing performance.
+                </p>
+
+                <figure style="text-align: center; margin: 2rem 0; margin-left: 0; margin-right: 0;">
+                    <img src="fig_1.png" alt="Figure 1" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <figcaption style="margin-top: 0.5rem; color: #555; font-size: 0.9rem; font-style: italic;">Figure 1: Redundancy analyses on visual tokens. (a) The sum of cosine similarity between each token and neighbouring 10 tokens. (b) The performance of LLaVA-1.5-7B when randomly removing 50% visual tokens or 5% text tokens.</figcaption>
+                </figure>
+
+                <h3>The Key Insight: Hierarchical Attention in Vision Encoders</h3>
+                <p>
+                    Most previous pruning methods either require expensive retraining or rely on specific architecture features like the <code>[CLS]</code> token (which modern models like SigLIP lack).
+                </p>
+                <p>
+                    Instead of looking at the LLM's cross-attention, we investigated the internal structure of the vision encoder itself. We discovered a universal <strong>hierarchical attention pattern</strong> across different ViT-based encoders (CLIP, SigLIP, DeiT, etc.):
+                </p>
+                <ul>
+                    <li><strong>Shallow layers:</strong> Often retain low-level noise.</li>
+                    <li><strong>Middle layers:</strong> Highly <strong>object-centric</strong>, naturally focusing on the semantic subjects of the image.</li>
+                    <li><strong>Deep layers:</strong> Distribute attention uniformly to capture <strong>global context</strong>.</li>
+                </ul>
+
+                <figure style="text-align: center; margin: 2rem 0; margin-left: 0; margin-right: 0;">
+                    <img src="fig_2_3.png" alt="Figure 2" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <figcaption style="margin-top: 0.5rem; color: #555; font-size: 0.9rem; font-style: italic;">Figure 2: Attention map for different layers of SigLIP and CLIP. Patches with higher scores are in yellow. We can see that the middle layer is more object-centric.</figcaption>
+                </figure>
+
+                <h3>How HiPrune Works</h3>
+                <p>
+                    Motivated by this hierarchical pattern, HiPrune selectively preserves a compact subset of tokens that collectively retain both fine-grained details and global information. It requires <strong>zero retraining</strong> and alters nothing about the original VLM structure.
+                </p>
+                <p>
+                    We select three specific types of tokens:
+                </p>
+                <ol>
+                    <li><strong>Anchor Tokens:</strong> Tokens with the highest attention scores in the <em>middle layers</em> (capturing main objects).</li>
+                    <li><strong>Buffer Tokens:</strong> Tokens spatially adjacent to Anchors (preserving spatial continuity and mitigating attention noise).</li>
+                    <li><strong>Register Tokens:</strong> Tokens with high attention in the <em>deepest/output layer</em> (providing global contextual summaries).</li>
+                </ol>
+
+                <figure style="text-align: center; margin: 2rem 0; margin-left: 0; margin-right: 0;">
+                    <img src="fig_5.png" alt="Figure 3" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <figcaption style="margin-top: 0.5rem; color: #555; font-size: 0.9rem; font-style: italic;">Figure 3: An overview of HiPrune. We first allocate anchor tokens that receive the highest attention in layer l and record buffer tokens around them. Then we allocate register tokens directly based on the last layer attention of the rest of the tokens. HiPrune only accesses the attention in the vision encoder while keeping the LLM unchanged.</figcaption>
+                </figure>
+                
+                <p>
+                    By combining these three components, HiPrune effectively covers the most critical parts of the image while discarding the redundant background.
+                </p>
+
+                <figure style="text-align: center; margin: 2rem 0; margin-left: 0; margin-right: 0;">
+                    <img src="fig_6.png" alt="Figure 4" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <figcaption style="margin-top: 0.5rem; color: #555; font-size: 0.9rem; font-style: italic;">Figure 4: Visualization on tokens retained by HiPrune. Anchor tokens are in yellow, buffer tokens are in red, and register tokens are in cyan. Anchor and buffer tokens focus on the sports player, the aircraft, and the fire extinguisher. We set $\alpha=0.5$ for a better visualization. The images are slightly resized, randomly chosen from the COCO val2017 set.</figcaption>
+                </figure>
+
+                <h3>State-of-the-Art Results</h3>
+                <p>
+                    We evaluated HiPrune across various architectures, including LLaVA-1.5, LLaVA-NeXT (fixed-length), and Qwen2.5-VL (dynamic-resolution). The results show a state-of-the-art trade-off between accuracy and efficiency:
+                </p>
+                <ul>
+                    <li><strong>LLaVA-1.5:</strong> Preserves <strong>99.3%</strong> of original task performance while keeping only <strong>33.3%</strong> of the visual tokens. Even at an extreme 11.1% token budget, it maintains 92.7% performance.</li>
+                    <li><strong>LLaVA-NeXT:</strong> Actually <em>boosts</em> overall performance by 2.6% when using 22.2% of tokens, while reducing FLOPs by 6×. Maintains 99.5% accuracy with just 11.1% tokens.</li>
+                    <li><strong>Efficiency:</strong> Reduces inference FLOPs and latency by up to <strong>9$\times$</strong>.</li>
+                </ul>
+
+                <figure style="text-align: center; margin: 2rem 0; margin-left: 0; margin-right: 0;">
+                    <img src="table_2.png" alt="Table 1" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <figcaption style="margin-top: 0.5rem; margin-bottom: 2rem; color: #555; font-size: 0.9rem; font-style: italic;">Table 1: Results on LLaVA-1.5-7B. All the methods are in a training-free way. `$^\dagger$' denotes results reproduced by us.</figcaption>
+
+                    <img src="table_4.png" alt="Table 2" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <figcaption style="margin-top: 0.5rem; color: #555; font-size: 0.9rem; font-style: italic;">Table 2: Results on Qwen2.5-VL-3B-Instruct.</figcaption>
+                </figure>
+
+                <h3>Conclusion</h3>
+                <p>
+                    HiPrune proves that you don't need complex merging algorithms or special tokens to compress visual information in VLMs. By simply leveraging the inherent layer-wise attention hierarchy already present inside vision encoders, we can achieve highly efficient, plug-and-play inference for universal Vision-Language Models.
+                </p>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2026 Jizhihui Liu.</p>
+    </footer>
+</body>
+</html>
